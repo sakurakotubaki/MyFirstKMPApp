@@ -1,8 +1,46 @@
 import SwiftUI
 import shared
+import Observation
+
+@MainActor
+final class ZipCodeViewModelWrapper: ObservableObject {
+    private let viewModel = ZipCodeViewModel()
+    private var task: Task<Void, Never>?
+    
+    @Published var address: AddressData? = nil
+    @Published var isLoading: Bool = false
+    @Published var error: String? = nil
+    
+    init() {
+        startObserving()
+    }
+    
+    deinit {
+        task?.cancel()
+    }
+    
+    private func startObserving() {
+        task = Task { [weak self] in
+            while !Task.isCancelled {
+                self?.updateState()
+                try? await Task.sleep(nanoseconds: 100_000_000)
+            }
+        }
+    }
+    
+    private func updateState() {
+        self.address = viewModel.currentAddress
+        self.isLoading = viewModel.currentIsLoading
+        self.error = viewModel.currentError
+    }
+    
+    func searchZipCode(zipCode: String) {
+        viewModel.searchZipCode(zipCode: zipCode)
+    }
+}
 
 struct ContentView: View {
-    @StateObject private var viewModel = ViewModelWrapper()
+    @StateObject private var viewModel = ZipCodeViewModelWrapper()
     @State private var zipCode: String = ""
     
     var body: some View {
@@ -64,36 +102,6 @@ struct ContentView: View {
                                          from: nil, 
                                          for: nil)
         }
-    }
-}
-
-@MainActor
-class ViewModelWrapper: ObservableObject {
-    private let viewModel = ZipCodeViewModel()
-    private var timer: Timer?
-    
-    @Published var address: AddressData? = nil
-    @Published var isLoading: Bool = false
-    @Published var error: String? = nil
-    
-    init() {
-        timer = Timer.scheduledTimer(withTimeInterval: 0.1, repeats: true) { [weak self] _ in
-            self?.updateValues()
-        }
-    }
-    
-    deinit {
-        timer?.invalidate()
-    }
-    
-    private func updateValues() {
-        self.address = viewModel.currentAddress
-        self.isLoading = viewModel.currentIsLoading
-        self.error = viewModel.currentError
-    }
-    
-    func searchZipCode(zipCode: String) {
-        viewModel.searchZipCode(zipCode: zipCode)
     }
 }
 
